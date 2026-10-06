@@ -3,3 +3,6 @@ spotify_episodes.json
 site/
 titles.txt
 *.png
+research/cache/
+__pycache__/
+*.pyc

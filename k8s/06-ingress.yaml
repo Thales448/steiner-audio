@@ -6,6 +6,8 @@ metadata:
   labels: {app.kubernetes.io/part-of: steiner}
   annotations:
     nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "120"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "120"
 spec:
   ingressClassName: nginx
   tls: [{hosts: [steiner.rtech.cloud], secretName: steiner-tls}]
@@ -13,4 +15,5 @@ spec:
   - host: steiner.rtech.cloud
     http:
       paths:
+      - {path: /api, pathType: Prefix, backend: {service: {name: steiner-api, port: {number: 80}}}}
       - {path: /, pathType: Prefix, backend: {service: {name: steiner, port: {number: 80}}}}
