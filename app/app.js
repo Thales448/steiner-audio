@@ -21,6 +21,7 @@ function setQS(patch){Object.assign(state,patch);const qs=new URLSearchParams();
   const q=$('#q').value.trim();if(q)qs.set('q',q);const s=qs.toString();const nh='#/'+(s?'?'+s:'');if(location.hash!==nh)history.replaceState(null,'',nh);renderLibrary()}
 function route(){const {path,qs}=parseHash();window.scrollTo(0,0);
   if(path[0]==='album'&&BY[path[1]])return renderAlbum(BY[path[1]],path[2]);
+  if(path[0]==='ask')return renderAsk();
   if(path[0]==='about')return renderAbout();
   for(const k of ['g','sort','y','sec','th','loc'])state[k]=qs.get(k)||({g:'none',sort:'cw'}[k]||'');
   if(qs.get('q')!==null)$('#q').value=qs.get('q');renderLibrary()}
@@ -95,6 +96,34 @@ function renderAlbum(a,ti){document.title=`${a.title} — Steiner Audio Library`
   ${rel.length?`<div class="related"><h3>Same section, around ${a.year}</h3><div class="grid">${rel.map(card).join('')}</div></div>`:''}
   </div></div>`;bindPlay();
   if(ti!==undefined&&a.tracks[+ti])playAlbum(a,+ti)}
+const ASK_PROMPTS=['What is anthroposophy?','Recommend lectures on karma','What did Steiner say about education?'];
+const chat={messages:[],busy:false};
+function renderAsk(){document.title='Ask — Steiner Audio Library';
+  const thread=chat.messages.map(m=>m.role==='user'
+    ?`<div class="msg user"><div class="bubble">${esc(m.text)}</div></div>`
+    :`<div class="msg bot"><div class="bubble">${answerHtml(m.data)}</div></div>`).join('');
+  $('#view').innerHTML=`<div class="ask"><h1>Ask the library</h1>
+  <p class="note">Answers come from a research index of these recordings and the public-domain texts at the Rudolf Steiner Archive. They cite CW numbers and link to the album pages. They are not transcripts of the readings.</p>
+  <div class="prompts">${ASK_PROMPTS.map(p=>`<button type="button" class="chip askq">${esc(p)}</button>`).join('')}</div>
+  <div id="thread" class="thread">${thread||'<div class="note">Try a question above, or ask about karma, education, the Gospels, or a CW number.</div>'}</div>
+  <form id="askform" class="askform"><textarea id="askq" rows="3" placeholder="Ask about a book, a theme, or a lecture…" ${chat.busy?'disabled':''}></textarea>
+  <button class="btn pri" type="submit" ${chat.busy?'disabled':''}>${chat.busy?'Thinking…':'Ask'}</button></form></div>`;
+  document.querySelectorAll('.askq').forEach(b=>b.onclick=()=>submitAsk(b.textContent));
+  $('#askform').onsubmit=e=>{e.preventDefault();const v=$('#askq').value.trim();if(v)submitAsk(v)};
+  const box=$('#askq');if(box&&!chat.busy)box.focus()}
+function answerHtml(d){if(!d)return '';
+  let h=d.notice?`<div class="banner">${esc(d.notice)}</div>`:'';
+  h+=`<div class="prose">${esc(d.answer||'')}</div>`;
+  if(d.recommendations&&d.recommendations.length){h+=`<h3>Recommended in this library</h3><div class="recs">${d.recommendations.map(r=>{const play=r.track&&r.track.play_href?`<a class="playlink" href="${esc(r.track.play_href)}">Play ${esc(r.track.title||'recording')}</a>`:'';return `<div class="rec"><a class="rec-main" href="${esc(r.href)}"><img src="${esc(r.cover||'')}" alt=""><span><b>${esc(r.cw?('CW '+r.cw):'Compilation')}</b> ${esc(r.title||'')}<span class="s">${esc([r.year_label,r.section].filter(Boolean).join(' · '))}</span></span></a>${play}</div>`}).join('')}</div>`}
+  if(d.citations&&d.citations.length){h+=`<h3>Sources</h3><ul class="cites">${d.citations.map(c=>`<li><a href="${esc(c.album_href)}">${esc((c.cw?'CW '+c.cw+' — ':'')+(c.book_title||''))}</a>${c.lecture_title?' · '+esc(c.lecture_title):''}${c.date?' · '+esc(c.date):''}${c.place?' · '+esc(c.place):''}${c.rsarchive_url?` · <a href="${esc(c.rsarchive_url)}" target="_blank" rel="noopener">RS Archive ↗</a>`:''}</li>`).join('')}</ul>`}
+  return h}
+async function submitAsk(q){if(chat.busy||!q)return;chat.busy=true;chat.messages.push({role:'user',text:q});renderAsk();
+  const history=chat.messages.slice(0,-1).filter(m=>m.role==='user'||m.data).slice(-6).map(m=>({role:m.role==='user'?'user':'assistant',content:m.role==='user'?m.text:(m.data&&m.data.answer)||''}));
+  try{const res=await fetch('/api/ask',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({question:q,history})});
+    const data=await res.json();if(!res.ok)throw new Error(data.error||('HTTP '+res.status));
+    chat.messages.push({role:'assistant',data})}
+  catch(err){chat.messages.push({role:'assistant',data:{mode:'error',notice:'The research API did not respond, so the library browser is all that is available right now. Locally, start python3 api/server.py with STEINER_STATIC=app.',answer:String(err.message||err),recommendations:[],citations:[]}})}
+  chat.busy=false;renderAsk();const thread=$('#thread');if(thread)thread.scrollTop=thread.scrollHeight}
 function renderAbout(){const d=DB.source;$('#view').innerHTML=`<div class="about"><h1>About this library</h1>
 <p>A visual index of <b>Rudolf Steiner Audio</b> — ${d.episodes_rss} recordings of Rudolf Steiner's books and lecture cycles read by <b>${esc(d.reader)}</b>, grouped into <b>${DB.albums.length}</b> books / lecture cycles.</p>
 <table><tr><th>Source</th><th></th></tr><tr><td>Spotify show</td><td><a href="${d.spotify_url}" target="_blank">${d.spotify_url}</a> (${d.episodes_spotify} episodes; ${d.episodes_matched} matched)</td></tr>
@@ -104,6 +133,7 @@ function renderAbout(){const d=DB.source;$('#view').innerHTML=`<div class="about
 <li><b>GA section</b> = the standard Gesamtausgabe ranges (1–28 written works, 51–87 public lectures, 88–253 lectures to members, 293–311 education, 312–319 medicine, 347–354 lectures to workers, …).</li>
 <li><b>Topic</b> = keyword tags from titles (Christology, Karma, Esoteric Development, Cosmology, Arts, Education, …).</li></ul>
 <p>Playback: ▶ buttons stream the full-length MP3 from the publisher's podcast host. The Spotify embed plays full episodes when you're logged into Spotify in this browser.</p>
+<p><a href="#/ask">Ask</a> searches a research index of these recordings against the public-domain texts at the Rudolf Steiner Archive. Answers cite CW numbers and open the album pages here. They are not transcripts of the readings. A full written answer needs an API key on the server; without one, Ask still returns the closest books and the indexed summaries.</p>
 <p>Please consider supporting the reader: <a href="https://rudolfsteineraudio.com/donations.html" target="_blank">rudolfsteineraudio.com/donations</a>.</p></div>`}
 // ---------- player
 const A=$('#audio'),P={a:null,i:0,t:null};

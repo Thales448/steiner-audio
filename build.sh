@@ -8,3 +8,5 @@ if [ -n "$SPOTIFY_CLIENT_ID" ]; then
 fi
 python3 build_index.py >/dev/null && python3 build_assets.py && python3 render_static.py
 cp catalog.json app/data/catalog.full.json
+# Research index is separate (it fetches rsarchive.org). Rebuild with:
+#   python3 research/build_research_index.py
