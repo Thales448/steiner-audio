@@ -1,0 +1,14 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: steiner-tls
+  namespace: steiner
+  labels: {app.kubernetes.io/part-of: steiner}
+spec:
+  secretName: steiner-tls
+  commonName: steiner.rtech.cloud
+  dnsNames: [steiner.rtech.cloud]
+  duration: 8760h
+  renewBefore: 720h
+  privateKey: {algorithm: ECDSA, size: 256}
+  issuerRef: {kind: ClusterIssuer, name: rquants-selfsigned}

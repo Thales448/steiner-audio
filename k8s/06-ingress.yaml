@@ -1,0 +1,16 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: steiner-ingress
+  namespace: steiner
+  labels: {app.kubernetes.io/part-of: steiner}
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+spec:
+  ingressClassName: nginx
+  tls: [{hosts: [steiner.rtech.cloud], secretName: steiner-tls}]
+  rules:
+  - host: steiner.rtech.cloud
+    http:
+      paths:
+      - {path: /, pathType: Prefix, backend: {service: {name: steiner, port: {number: 80}}}}

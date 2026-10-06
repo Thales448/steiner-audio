@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: steiner-nginx
+  namespace: steiner
+  labels: {app.kubernetes.io/part-of: steiner}
+data:
+  default.conf: |
+    server {
+      listen 8080;
+      root /usr/share/nginx/html;
+      index index.html;
+      gzip on; gzip_types application/json text/css application/javascript image/svg+xml; gzip_min_length 1024;
+      location = /healthz { access_log off; return 200 "ok\n"; }
+      location /img/ { expires 30d; add_header Cache-Control "public"; }
+      location /data/ { expires 10m; }
+      location / { try_files $uri $uri/ /index.html; add_header Cache-Control "no-cache"; }
+    }
